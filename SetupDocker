@@ -1,0 +1,30 @@
+FROM ubuntu:22.04
+
+# USER = program name
+ENV USER=user
+ENV DEBUG_PORT=7000
+
+# Install GDB and GDBServer
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      gdb \
+      gdbserver \
+ && rm -rf /var/lib/apt/lists/*
+
+# Manage user and permissions
+RUN adduser --disabled-password --gecos "" "$USER"
+ADD flag "/home/$USER/flag"
+ADD "$USER" "/home/$USER/$USER"
+
+RUN chown root:"$USER" "/home/$USER/flag" \
+ && chmod 440 "/home/$USER/flag" \
+ && chown root:root "/home/$USER/$USER" \
+ && chmod 755 "/home/$USER/$USER"
+
+WORKDIR "/home/$USER"
+USER "$USER"
+
+EXPOSE $DEBUG_PORT
+
+CMD gdbserver 127.0.0.1:${DEBUG_PORT} /home/${USER}/${USER}
+
