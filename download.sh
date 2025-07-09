@@ -72,7 +72,11 @@ EOF
 
     # Build Docker image
     echo "[+] Building Docker image..."
-    docker build "$PROBLEM_DIR" -f "$PROBLEM_DIR/Dockerfile" -t "$NAME"
+    if docker build "$PROBLEM_DIR" -f "$PROBLEM_DIR/Dockerfile" -t "$NAME"; then
+        echo "[+] Docker image $NAME built successfully."
+    else
+        echo "[-] Failed to build Docker image $NAME."
+    fi
 
 
     # Create run script
@@ -89,7 +93,7 @@ fi
 docker run -d -p \$HOST_PORT:\$CONTAINER_PORT --name ${NAME} ${NAME}
 EOF
     chmod +x "$PROJECT_DIR/run.sh"
-    echo "[+] Docker image $NAME built successfully."
+    echo "[+] Run script created at $PROJECT_DIR/run.sh."
 
     
     echo "[+] Docker setup completed successfully."
