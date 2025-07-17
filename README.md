@@ -22,3 +22,5 @@ name/
 ```bash
 ./download.sh <url> <name> [subdir (default: problem)]
 ```
+
+To use `./run.sh`, and `./build.sh`, the user must modify the port and docker image according to the given dockerfile.
