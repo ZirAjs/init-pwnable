@@ -5,14 +5,14 @@ context.log_level = "error"
 context.arch = "amd64"
 
 WORKDIR = "./problem"
-EXECUTABLE = f"{WORKDIR}/prob"
+EXECUTABLE = f"{WORKDIR}/problem/prob"
 
 HOST = "localhost"
 PORT = 7138
 
 
-elf = ELF(EXECUTABLE)
-libc = ELF("/lib/x86_64-linux-gnu/libc.so.6")
+# e = ELF(EXECUTABLE)
+# libc_e = ELF("/lib/x86_64-linux-gnu/libc.so.6")
 
 
 def connect():
@@ -22,15 +22,6 @@ def connect():
         return remote(HOST, PORT)
 
 
-def payload():
-    payload: bytes = b"A" * 0x100
-    clipboard.copy(payload.decode("latin-1"))
-    return payload
-
-
-if __name__ == "__main__":
-    p = connect()
-    p.recvuntil(b": ")
-    p.sendline(payload())
-    p.interactive()
-    p.close()
+p = connect()
+p.interactive()
+p.close()

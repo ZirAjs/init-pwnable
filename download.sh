@@ -10,9 +10,17 @@ if [ -z "$URL" ] || [ -z "$NAME" ]; then
     echo "Usage: $0 <url> <name> [subdir (default: problem)]"
     exit 1
 fi
+NAME=$(echo "$NAME" | tr '[:upper:]' '[:lower:]')
 
 GDBNAME="gdb$NAME"
 PROJECT_DIR="$BASE/$NAME"
+
+# Check if the directory already exists
+if [ -d "$PROJECT_DIR" ]; then
+    echo "[-] Directory $PROJECT_DIR already exists. Please remove it or choose a different name."
+    exit 1
+fi
+
 mkdir -p "$PROJECT_DIR"
 
 PROBLEM_DIR="$PROJECT_DIR/$SUBDIR"
@@ -28,7 +36,19 @@ mkdir -p "$PROBLEM_DIR"
 # Download and unzip
 echo "[+] Downloading problem from the URL..."
 curl -L "$URL" -o "$TMP_ZIP"
-unzip -q "$TMP_ZIP" -d "$PROBLEM_DIR"
+if ! [ -f "$TMP_ZIP" ]; then
+    echo "[-] Download failed. Aborting..."
+    rm -rf $PROJECT_DIR
+    exit 1
+fi
+if unzip -q "$TMP_ZIP" -d "$PROBLEM_DIR"; then
+    echo "[+] Unzipped successfully to $PROBLEM_DIR"
+else
+    echo "[-] Unzip failed. Please check the URL or the zip file."
+    echo "[-] Aborting..."
+    rm -rf $PROJECT_DIR
+    exit 1
+fi
 rm -f "$TMP_ZIP"
 
 
@@ -47,13 +67,20 @@ if [ -f "$PROBLEM_DIR/Dockerfile" ]; then
 #!/usr/bin/env bash
 HOST_PORT=7000
 CONTAINER_PORT=7000
-# Check if the container is already running
-if [ "\$(docker ps -q -f name=${GDBNAME})" ]; then
-    echo "Container '${GDBNAME}' is already running. Rerunning..."
-    docker kill ${GDBNAME}
-    docker rm ${GDBNAME} 
+NAME=${GDBNAME}
+
+# 기존에 존재하는(실행 중이든 아니든) 컨테이너가 있으면 강제 삭제
+if docker ps -a -q -f name="^/\${NAME}$" >/dev/null; then
+  echo "Removing existing container '\${NAME}'..."
+  docker rm -f "\${NAME}"
 fi
-docker run -it -p \$HOST_PORT:\$CONTAINER_PORT --cap-add SYS_PTRACE --security-opt seccomp=unconfined --name ${GDBNAME} ${GDBNAME}
+
+docker run -it \
+  -p "\${HOST_PORT}:\${CONTAINER_PORT}" \
+  --cap-add SYS_PTRACE \
+  --security-opt seccomp=unconfined \
+  --name "\${NAME}" \
+  "\${NAME}"
 EOF
     chmod +x "$PROJECT_DIR/debug.sh"
     echo "[+] Debug environment set up successfully."
@@ -82,15 +109,17 @@ EOF
     # Create run script
     cat > "$PROJECT_DIR/run.sh" <<EOF
 #!/usr/bin/env bash
-HOST_PORT=7182
-CONTAINER_PORT=7182
-# Check if the container is already running
-if [ "\$(docker ps -q -f name=${NAME})" ]; then
-    echo "Container '${NAME}' is already running. Rerunning..."
-    docker kill ${NAME}
-    docker rm ${NAME}
+HOST_PORT=7138
+CONTAINER_PORT=7138
+NAME=${NAME}
+
+# 기존에 존재하는(실행 중이든 아니든) 컨테이너가 있으면 강제 삭제
+if docker ps -a -q -f name="^/\${NAME}$" >/dev/null; then
+  echo "Removing existing container '\${NAME}'..."
+  docker rm -f "\${NAME}"
 fi
-docker run -d -p \$HOST_PORT:\$CONTAINER_PORT --name ${NAME} ${NAME}
+
+docker run -d -p \$HOST_PORT:\$CONTAINER_PORT --name \${NAME} \${NAME}
 EOF
     chmod +x "$PROJECT_DIR/run.sh"
     echo "[+] Run script created at $PROJECT_DIR/run.sh."
@@ -109,10 +138,14 @@ if [ -d "$PROBLEM_DIR" ]; then
     echo "Cleaning up $PROBLEM_DIR ..."
     if [ -f "$PROBLEM_DIR/Dockerfile" ]; then
         echo "Removing Docker image..."
+        docker stop "$NAME" 
+        docker rm "$NAME"
         docker rmi "$NAME" || echo "Docker image $NAME does not exist."
     fi
     if [ -f "$PROBLEM_DIR/gdbDockerfile" ]; then
         echo "Removing GDB Docker image..."
+        docker stop "$GDBNAME"
+        docker rm "$GDBNAME"
         docker rmi "$GDBNAME" || echo "Docker image $GDBNAME does not exist."
     fi
     rm -rfI "$PROBLEM_DIR"
@@ -122,6 +155,7 @@ else
 fi
 EOF
 chmod +x "$PROJECT_DIR/cleanup.sh"
+cd "$PROJECT_DIR"
 echo "[+] Cleanup script created at $PROJECT_DIR/cleanup.sh."
 
 echo "[+] All setup completed successfully."
